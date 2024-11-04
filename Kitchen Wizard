@@ -1,0 +1,101 @@
+import sqlite3
+import pandas as pd
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# Function to connect to the SQLite database
+def connect_to_db():
+    conn = sqlite3.connect('kitchen_wizard.db')  # Ensure the path is correct
+    return conn
+
+# Function to create tables and insert data if they don't exist
+def setup_database(conn):
+    cursor = conn.cursor()
+    
+    # Create the recipes table if it doesn't exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recipes (
+            recipe_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipe_name TEXT NOT NULL,
+            ingredients TEXT NOT NULL,
+            instructions TEXT NOT NULL,
+            calories INTEGER NOT NULL
+        );
+    """)
+    
+    # Create the alternatives table if it doesn't exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS alternatives (
+            alternative_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ingredient TEXT NOT NULL,
+            alternative TEXT NOT NULL
+        );
+    """)
+    
+    # Insert sample data into the recipes table if it's empty
+    cursor.execute("SELECT COUNT(*) FROM recipes;")
+    if cursor.fetchone()[0] == 0:  # Check if the table is empty
+        cursor.execute("""
+            INSERT INTO recipes (recipe_name, ingredients, instructions, calories) VALUES
+            ('Chocolate Cake', 'Flour, Sugar, Eggs, Butter, Chocolate', 'Mix the ingredients and bake in the oven', 300),
+            ('Vegetable Salad', 'Lettuce, Tomato, Cucumber, Olive Oil', 'Mix all the ingredients together', 150),
+            ('Grilled Chicken', 'Chicken, Thyme, Olive Oil', 'Grill the chicken with spices', 400);
+        """)
+
+    # Insert sample data into the alternatives table if it's empty
+    cursor.execute("SELECT COUNT(*) FROM alternatives;")
+    if cursor.fetchone()[0] == 0:  # Check if the table is empty
+        cursor.execute("""
+            INSERT INTO alternatives (ingredient, alternative) VALUES
+            ('Flour', 'Almond Flour'),
+            ('Sugar', 'Honey'),
+            ('Olive Oil', 'Coconut Oil');
+        """)
+
+    # Commit the changes
+    conn.commit()
+
+# Function to fetch all recipes from the database
+def fetch_recipes(conn):
+    query = "SELECT * FROM recipes"
+    return pd.read_sql_query(query, conn)
+
+# Function to display recipes in the Tkinter GUI
+def display_recipes():
+    conn = connect_to_db()
+    setup_database(conn)
+    recipes_df = fetch_recipes(conn)
+    
+    # Clear the treeview
+    for row in tree.get_children():
+        tree.delete(row)
+    
+    # Insert data into the treeview
+    for index, row in recipes_df.iterrows():
+        tree.insert("", "end", values=(row['recipe_id'], row['recipe_name'], row['ingredients'], row['instructions'], row['calories']))
+    
+    conn.close()
+
+# Create the main application window
+app = tk.Tk()
+app.title("Kitchen Wizard")
+
+# Create a frame for the treeview
+frame = tk.Frame(app)
+frame.pack(pady=10)
+
+# Create a treeview to display recipes
+tree = ttk.Treeview(frame, columns=("ID", "Name", "Ingredients", "Instructions", "Calories"), show="headings")
+tree.heading("ID", text="ID")
+tree.heading("Name", text="Recipe Name")
+tree.heading("Ingredients", text="Ingredients")
+tree.heading("Instructions", text="Instructions")
+tree.heading("Calories", text="Calories")
+tree.pack()
+
+# Add a button to load the recipes
+load_button = tk.Button(app, text="Load Recipes", command=display_recipes)
+load_button.pack(pady=10)
+
+# Run the Tkinter event loop
+app.mainloop()
